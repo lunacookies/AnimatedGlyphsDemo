@@ -11,19 +11,7 @@
 {
 	[super viewDidLoad];
 
-	NSAttributedString *attributedString = [[NSAttributedString alloc]
-	        initWithString:@"Sphinx of black quartz, judge my vow."
-	            attributes:@{
-		            NSFontAttributeName : [NSFont systemFontOfSize:13],
-		            NSForegroundColorAttributeName : NSColor.labelColor,
-	            }];
-
-	NSColor *backgroundColor = NSColor.textBackgroundColor;
-
 	MetalView *metalView = [[MetalView alloc] init];
-	metalView.attributedString = attributedString;
-	metalView.backgroundColor = backgroundColor;
-
 	[self.view addSubview:metalView];
 	metalView.translatesAutoresizingMaskIntoConstraints = NO;
 	[NSLayoutConstraint activateConstraints:@[

@@ -25,9 +25,6 @@ struct Sprite
 	id<MTLTexture> texture;
 
 	GlyphCache *glyphCache;
-
-	NSAttributedString *attributedString;
-	NSColor *backgroundColor;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
@@ -65,6 +62,13 @@ struct Sprite
 
 - (void)updateLayer
 {
+	NSAttributedString *attributedString = [[NSAttributedString alloc]
+	        initWithString:@"Sphinx of black quartz, judge my vow."
+	            attributes:@{
+		            NSFontAttributeName : [NSFont systemFontOfSize:13],
+		            NSForegroundColorAttributeName : NSColor.labelColor,
+	            }];
+
 	CTFramesetterRef framesetter = CTFramesetterCreateWithAttributedString(
 	        (__bridge CFAttributedStringRef)attributedString);
 
@@ -202,7 +206,8 @@ struct Sprite
 
 	id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
 
-	NSColor *convertedBackgroundColor = [backgroundColor colorUsingColorSpace:colorSpace];
+	NSColor *convertedBackgroundColor =
+	        [NSColor.textBackgroundColor colorUsingColorSpace:colorSpace];
 	MTLClearColor clearColor = {0};
 	clearColor.red = convertedBackgroundColor.redComponent;
 	clearColor.green = convertedBackgroundColor.greenComponent;
@@ -303,28 +308,6 @@ struct Sprite
 	texture.label = @"Layer Contents";
 
 	self.layer.contents = (__bridge id)iosurface;
-}
-
-- (NSAttributedString *)attributedString
-{
-	return attributedString;
-}
-
-- (void)setAttributedString:(NSAttributedString *)attributedString_
-{
-	attributedString = attributedString_;
-	self.needsDisplay = YES;
-}
-
-- (NSColor *)backgroundColor
-{
-	return backgroundColor;
-}
-
-- (void)setBackgroundColor:(NSColor *)backgroundColor_
-{
-	backgroundColor = backgroundColor_;
-	self.needsDisplay = YES;
 }
 
 @end
