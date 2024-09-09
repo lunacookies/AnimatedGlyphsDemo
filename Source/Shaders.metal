@@ -91,25 +91,3 @@ fragment_main(rasterizer_data input [[stage_in]],
 	result *= sample;
 	return result;
 }
-
-kernel void
-diff(uint2 position_in_grid [[thread_position_in_grid]],
-        texture2d<float, access::write> destination,
-        texture2d<float> texture_a,
-        texture2d<float> texture_b)
-{
-	sampler sampler(coord::pixel);
-	float4 sample_a = texture_a.sample(sampler, (float2)position_in_grid);
-	float4 sample_b = texture_b.sample(sampler, (float2)position_in_grid);
-
-	sample_a.rgb /= sample_a.a;
-	sample_b.rgb /= sample_b.a;
-
-	float4 difference = sample_b - sample_a;
-	difference = (difference + 1) / 2;
-	difference.rgb *= difference.a;
-
-	difference = clamp(difference, 0, 1);
-
-	destination.write(difference, position_in_grid);
-}
