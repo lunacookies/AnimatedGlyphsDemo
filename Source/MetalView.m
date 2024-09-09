@@ -17,8 +17,6 @@ struct Sprite
 
 @implementation MetalView
 {
-	NSNotificationCenter *notificationCenter;
-
 	id<MTLDevice> device;
 	id<MTLCommandQueue> commandQueue;
 	id<MTLRenderPipelineState> pipelineState;
@@ -32,11 +30,9 @@ struct Sprite
 	NSColor *backgroundColor;
 }
 
-- (instancetype)initWithNotificationCenter:(NSNotificationCenter *)notificationCenter_
+- (instancetype)initWithFrame:(NSRect)frame
 {
-	self = [super init];
-
-	notificationCenter = notificationCenter_;
+	self = [super initWithFrame:frame];
 
 	self.wantsLayer = YES;
 
@@ -248,8 +244,6 @@ struct Sprite
 	[commandBuffer commit];
 	[commandBuffer waitUntilCompleted];
 	[self.layer setContentsChanged];
-
-	[notificationCenter postNotificationName:UpdatedTextureBNotificationName object:texture];
 
 	free(lineOrigins);
 	free(sprites);

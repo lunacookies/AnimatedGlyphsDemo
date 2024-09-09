@@ -20,9 +20,7 @@
 
 	NSColor *backgroundColor = NSColor.textBackgroundColor;
 
-	NSNotificationCenter *notificationCenter = [[NSNotificationCenter alloc] init];
-
-	MetalView *metalView = [[MetalView alloc] initWithNotificationCenter:notificationCenter];
+	MetalView *metalView = [[MetalView alloc] init];
 	metalView.attributedString = attributedString;
 	metalView.backgroundColor = backgroundColor;
 

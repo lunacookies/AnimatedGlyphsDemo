@@ -30,9 +30,6 @@ typedef ptrdiff_t imm;
 		__builtin_debugtrap(); \
 	}
 
-static NSString *const UpdatedTextureANotificationName = @"UpdatedTextureA";
-static NSString *const UpdatedTextureBNotificationName = @"UpdatedTextureB";
-
 @interface
 CALayer (Private)
 - (void)setContentsChanged;
