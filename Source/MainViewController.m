@@ -3,7 +3,7 @@
 - (instancetype)init
 {
 	self = [super init];
-	self.title = @"MetalTextRendering";
+	self.title = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleDisplayName"];
 	return self;
 }
 
