@@ -3,6 +3,7 @@ struct Arguments
 {
 	simd_float2 size;
 	MTLResourceID glyphCacheTexture;
+	uint64 sprites;
 };
 
 typedef struct Sprite Sprite;
@@ -25,6 +26,8 @@ struct Sprite
 	id<MTLTexture> texture;
 
 	GlyphCache *glyphCache;
+	id<MTLBuffer> sprites;
+	imm spriteCapacity;
 
 	NSMutableString *contents;
 }
@@ -105,7 +108,25 @@ struct Sprite
 
 	float scaleFactor = (float)self.window.backingScaleFactor;
 
-	Sprite *sprites = calloc((umm)frameGlyphCount, sizeof(Sprite));
+	if (frameGlyphCount > spriteCapacity)
+	{
+		do
+		{
+			if (spriteCapacity == 0)
+			{
+				spriteCapacity = 1024;
+			}
+			else
+			{
+				spriteCapacity *= 2;
+			}
+		} while (frameGlyphCount > spriteCapacity);
+		sprites = [device newBufferWithLength:(umm)spriteCapacity * sizeof(Sprite)
+		                              options:MTLResourceCPUCacheModeWriteCombined |
+		                                      MTLResourceStorageModeShared |
+		                                      MTLResourceHazardTrackingModeTracked];
+	}
+
 	imm spriteCount = 0;
 
 	NSColorSpace *colorSpace = self.window.colorSpace;
@@ -189,7 +210,7 @@ struct Sprite
 				                           font:runFont
 				                 subpixelOffset:fractionalPosition];
 
-				Sprite *sprite = sprites + spriteCount;
+				Sprite *sprite = (Sprite *)sprites.contents + spriteCount;
 				spriteCount++;
 
 				sprite->position.x = (float)roundedPosition.x;
@@ -208,6 +229,9 @@ struct Sprite
 			free(glyphBoundingRects);
 		}
 	}
+
+	Assert(spriteCount <= spriteCapacity);
+	Assert(spriteCount <= frameGlyphCount);
 
 	id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
 
@@ -232,6 +256,7 @@ struct Sprite
 	arguments.size.x = (float)size.width;
 	arguments.size.y = (float)size.height;
 	arguments.glyphCacheTexture = glyphCache.texture.gpuResourceID;
+	arguments.sprites = sprites.gpuAddress;
 
 	if (spriteCount > 0)
 	{
@@ -239,16 +264,12 @@ struct Sprite
 		[encoder useResource:glyphCache.texture
 		               usage:MTLResourceUsageRead
 		              stages:MTLRenderStageFragment];
+		[encoder useResource:sprites
+		               usage:MTLResourceUsageRead
+		              stages:MTLRenderStageVertex | MTLRenderStageFragment];
 
 		[encoder setVertexBytes:&arguments length:sizeof(arguments) atIndex:0];
 		[encoder setFragmentBytes:&arguments length:sizeof(arguments) atIndex:0];
-
-		[encoder setVertexBytes:sprites
-		                 length:sizeof(*sprites) * (umm)spriteCount
-		                atIndex:1];
-		[encoder setFragmentBytes:sprites
-		                   length:sizeof(*sprites) * (umm)spriteCount
-		                  atIndex:1];
 
 		[encoder drawPrimitives:MTLPrimitiveTypeTriangle
 		            vertexStart:0
@@ -263,7 +284,6 @@ struct Sprite
 	[self.layer setContentsChanged];
 
 	free(lineOrigins);
-	free(sprites);
 	CFRelease(frame);
 	CFRelease(framesetter);
 	CFRelease(path);

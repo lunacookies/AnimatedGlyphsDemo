@@ -1,12 +1,6 @@
 #include <metal_stdlib>
 using namespace metal;
 
-struct arguments
-{
-	float2 size;
-	texture2d<float> glyph_cache;
-};
-
 struct sprite
 {
 	float2 position;
@@ -14,6 +8,13 @@ struct sprite
 	float2 texture_coords_black;
 	float2 texture_coords_white;
 	float4 color;
+};
+
+struct arguments
+{
+	float2 size;
+	texture2d<float> glyph_cache;
+	device sprite *sprites;
 };
 
 struct rasterizer_data
@@ -38,10 +39,9 @@ constant float2 positions[] = {
 vertex rasterizer_data
 vertex_main(uint vertex_id [[vertex_id]],
         uint instance_id [[instance_id]],
-        constant arguments &arguments,
-        device const sprite *sprites)
+        constant arguments &arguments)
 {
-	sprite sprite = sprites[instance_id];
+	sprite sprite = arguments.sprites[instance_id];
 
 	float2 position = sprite.position;
 	position += sprite.size * positions[vertex_id];
@@ -75,11 +75,9 @@ vertex_main(uint vertex_id [[vertex_id]],
 }
 
 fragment float4
-fragment_main(rasterizer_data input [[stage_in]],
-        constant arguments &arguments,
-        device const sprite *sprites)
+fragment_main(rasterizer_data input [[stage_in]], constant arguments &arguments)
 {
-	sprite sprite = sprites[input.instance_id];
+	sprite sprite = arguments.sprites[input.instance_id];
 
 	sampler sampler(filter::nearest, address::clamp_to_border, border_color::opaque_white);
 	float sample_black = arguments.glyph_cache.sample(sampler, input.texture_coords_black).r;
