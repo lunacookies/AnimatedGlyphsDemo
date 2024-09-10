@@ -122,9 +122,7 @@ struct Sprite
 			}
 		} while (frameGlyphCount > spriteCapacity);
 		sprites = [device newBufferWithLength:(umm)spriteCapacity * sizeof(Sprite)
-		                              options:MTLResourceCPUCacheModeWriteCombined |
-		                                      MTLResourceStorageModeShared |
-		                                      MTLResourceHazardTrackingModeTracked];
+		                              options:MTLResourceStorageModeShared];
 	}
 
 	imm spriteCount = 0;
