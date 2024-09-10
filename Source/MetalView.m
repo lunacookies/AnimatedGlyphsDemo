@@ -322,8 +322,28 @@ struct Sprite
 
 - (void)keyDown:(NSEvent *)event
 {
-	NSString *string = event.characters;
+	[self interpretKeyEvents:@[ event ]];
+}
+
+- (void)insertText:(id)idString
+{
+	NSString *string = idString;
 	[contents appendString:string];
+	self.needsDisplay = YES;
+}
+
+- (void)insertNewline:(id)sender
+{
+	[contents appendString:@"\n"];
+	self.needsDisplay = YES;
+}
+
+- (void)deleteBackward:(id)sender
+{
+	NSRange range = {0};
+	range.length = 1;
+	range.location = contents.length - range.length;
+	[contents deleteCharactersInRange:range];
 	self.needsDisplay = YES;
 }
 
