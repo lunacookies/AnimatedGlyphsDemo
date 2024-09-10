@@ -347,11 +347,14 @@ struct Sprite
 
 - (void)deleteBackward:(id)sender
 {
-	NSRange range = {0};
-	range.length = 1;
-	range.location = contents.length - range.length;
-	[contents deleteCharactersInRange:range];
-	self.needsDisplay = YES;
+	if (contents.length > 0)
+	{
+		NSRange range = {0};
+		range.length = 1;
+		range.location = contents.length - range.length;
+		[contents deleteCharactersInRange:range];
+		self.needsDisplay = YES;
+	}
 }
 
 @end
