@@ -25,6 +25,8 @@ struct Sprite
 	id<MTLTexture> texture;
 
 	GlyphCache *glyphCache;
+
+	NSMutableString *contents;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
@@ -52,6 +54,9 @@ struct Sprite
 
 	pipelineState = [device newRenderPipelineStateWithDescriptor:descriptor error:nil];
 
+	contents = [[NSMutableString alloc] init];
+	[contents appendString:@"hello world"];
+
 	return self;
 }
 
@@ -63,7 +68,7 @@ struct Sprite
 - (void)updateLayer
 {
 	NSAttributedString *attributedString = [[NSAttributedString alloc]
-	        initWithString:@"Sphinx of black quartz, judge my vow."
+	        initWithString:contents
 	            attributes:@{
 		            NSFontAttributeName : [NSFont systemFontOfSize:13],
 		            NSForegroundColorAttributeName : NSColor.labelColor,
@@ -308,6 +313,18 @@ struct Sprite
 	texture.label = @"Layer Contents";
 
 	self.layer.contents = (__bridge id)iosurface;
+}
+
+- (BOOL)acceptsFirstResponder
+{
+	return YES;
+}
+
+- (void)keyDown:(NSEvent *)event
+{
+	NSString *string = event.characters;
+	[contents appendString:string];
+	self.needsDisplay = YES;
 }
 
 @end
