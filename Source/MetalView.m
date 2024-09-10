@@ -233,21 +233,28 @@ struct Sprite
 	arguments.size.y = (float)size.height;
 	arguments.glyphCacheTexture = glyphCache.texture.gpuResourceID;
 
-	[encoder setRenderPipelineState:pipelineState];
-	[encoder useResource:glyphCache.texture
-	               usage:MTLResourceUsageRead
-	              stages:MTLRenderStageFragment];
+	if (spriteCount > 0)
+	{
+		[encoder setRenderPipelineState:pipelineState];
+		[encoder useResource:glyphCache.texture
+		               usage:MTLResourceUsageRead
+		              stages:MTLRenderStageFragment];
 
-	[encoder setVertexBytes:&arguments length:sizeof(arguments) atIndex:0];
-	[encoder setFragmentBytes:&arguments length:sizeof(arguments) atIndex:0];
+		[encoder setVertexBytes:&arguments length:sizeof(arguments) atIndex:0];
+		[encoder setFragmentBytes:&arguments length:sizeof(arguments) atIndex:0];
 
-	[encoder setVertexBytes:sprites length:sizeof(*sprites) * (umm)spriteCount atIndex:1];
-	[encoder setFragmentBytes:sprites length:sizeof(*sprites) * (umm)spriteCount atIndex:1];
+		[encoder setVertexBytes:sprites
+		                 length:sizeof(*sprites) * (umm)spriteCount
+		                atIndex:1];
+		[encoder setFragmentBytes:sprites
+		                   length:sizeof(*sprites) * (umm)spriteCount
+		                  atIndex:1];
 
-	[encoder drawPrimitives:MTLPrimitiveTypeTriangle
-	            vertexStart:0
-	            vertexCount:6
-	          instanceCount:(umm)spriteCount];
+		[encoder drawPrimitives:MTLPrimitiveTypeTriangle
+		            vertexStart:0
+		            vertexCount:6
+		          instanceCount:(umm)spriteCount];
+	}
 
 	[encoder endEncoding];
 
