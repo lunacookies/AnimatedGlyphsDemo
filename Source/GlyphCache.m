@@ -81,7 +81,13 @@ static const CGFloat padding = 2;
 	CachedGlyph *cachedGlyph = &entry->cachedGlyph;
 	cachedGlyph->offset = padding;
 
-	CGRect boundingRect = [self boundingRectForGlyph:glyph fromFont:font];
+	CGRect boundingRect = {0};
+	CTFontGetBoundingRectsForGlyphs(font, kCTFontOrientationDefault, &glyph, &boundingRect, 1);
+	boundingRect.origin.x *= scaleFactor;
+	boundingRect.origin.y *= scaleFactor;
+	boundingRect.size.width *= scaleFactor;
+	boundingRect.size.height *= scaleFactor;
+
 	cachedGlyph->size.x = (float)ceil(boundingRect.size.width);
 	cachedGlyph->size.y = (float)ceil(boundingRect.size.height);
 	cachedGlyph->size += 2 * padding;
@@ -128,39 +134,21 @@ static const CGFloat padding = 2;
 		position.x += padding;
 		position.y += padding;
 
+		CGPoint drawPosition = position;
+		drawPosition.x /= scaleFactor;
+		drawPosition.y /= scaleFactor;
+
+		CTFontDrawGlyphs(font, &glyph, &drawPosition, 1, context);
+		[texture replaceRegion:MTLRegionMake2D(0, 0, (umm)diameter, (umm)diameter)
+		           mipmapLevel:0
+		             withBytes:CGBitmapContextGetData(context)
+		           bytesPerRow:(umm)diameter];
+
 		largestGlyphHeight = Max(largestGlyphHeight, boundingRect.size.height);
-
-		[self drawGlyph:glyph fromFont:font atPosition:position];
-
 		cursor.x += ceil(boundingRect.size.width) + 2 * padding;
 	}
 
 	return *cachedGlyph;
-}
-
-- (void)drawGlyph:(CGGlyph)glyph fromFont:(CTFontRef)font atPosition:(CGPoint)position
-{
-	position.x /= scaleFactor;
-	position.y /= scaleFactor;
-
-	CTFontDrawGlyphs(font, &glyph, &position, 1, context);
-	[texture replaceRegion:MTLRegionMake2D(0, 0, (umm)diameter, (umm)diameter)
-	           mipmapLevel:0
-	             withBytes:CGBitmapContextGetData(context)
-	           bytesPerRow:(umm)diameter];
-}
-
-- (CGRect)boundingRectForGlyph:(CGGlyph)glyph fromFont:(CTFontRef)font
-{
-	CGRect boundingRect = {0};
-	CTFontGetBoundingRectsForGlyphs(font, kCTFontOrientationDefault, &glyph, &boundingRect, 1);
-
-	boundingRect.origin.x *= scaleFactor;
-	boundingRect.origin.y *= scaleFactor;
-	boundingRect.size.width *= scaleFactor;
-	boundingRect.size.height *= scaleFactor;
-
-	return boundingRect;
 }
 
 - (void)dealloc
