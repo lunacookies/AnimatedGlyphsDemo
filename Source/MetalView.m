@@ -133,9 +133,9 @@ struct Sprite
 	for (imm lineIndex = 0; lineIndex < lineCount; lineIndex++)
 	{
 		CTLineRef line = CFArrayGetValueAtIndex(lines, lineIndex);
-		CGPoint lineOrigin = lineOrigins[lineIndex];
-		lineOrigin.x += frameRect.origin.x;
-		lineOrigin.y += frameRect.origin.y;
+		simd_float2 lineOrigin = 0;
+		lineOrigin.x = (float)(lineOrigins[lineIndex].x + frameRect.origin.x);
+		lineOrigin.y = (float)(lineOrigins[lineIndex].y + frameRect.origin.y);
 
 		CFArrayRef runs = CTLineGetGlyphRuns(line);
 		imm runCount = CFArrayGetCount(runs);
@@ -177,31 +177,36 @@ struct Sprite
 			for (imm glyphIndex = 0; glyphIndex < runGlyphCount; glyphIndex++)
 			{
 				CGGlyph glyph = glyphs[glyphIndex];
-				CGPoint glyphPosition = glyphPositions[glyphIndex];
-				CGRect glyphBoundingRect = glyphBoundingRects[glyphIndex];
 
-				if (glyphBoundingRect.size.width == 0 ||
-				        glyphBoundingRect.size.height == 0)
+				simd_float2 glyphPosition = 0;
+				glyphPosition.x = (float)glyphPositions[glyphIndex].x;
+				glyphPosition.y = (float)glyphPositions[glyphIndex].y;
+
+				simd_float2 glyphBoundingRectOrigin = 0;
+				simd_float2 glyphBoundingRectSize = 0;
+				{
+					CGRect glyphBoundingRect = glyphBoundingRects[glyphIndex];
+					glyphBoundingRectOrigin.x =
+					        (float)glyphBoundingRect.origin.x;
+					glyphBoundingRectOrigin.y =
+					        (float)glyphBoundingRect.origin.y;
+					glyphBoundingRectSize.x =
+					        (float)glyphBoundingRect.size.width;
+					glyphBoundingRectSize.y =
+					        (float)glyphBoundingRect.size.height;
+				}
+
+				if (simd_any(glyphBoundingRectSize == 0))
 				{
 					continue;
 				}
 
-				CGPoint rawPosition = {0};
-				rawPosition.x =
-				        lineOrigin.x + glyphPosition.x + glyphBoundingRect.origin.x;
-				rawPosition.y =
-				        lineOrigin.y + glyphPosition.y + glyphBoundingRect.origin.y;
+				simd_float2 rawPosition =
+				        lineOrigin + glyphPosition + glyphBoundingRectOrigin;
+				rawPosition *= scaleFactor;
 
-				rawPosition.x *= scaleFactor;
-				rawPosition.y *= scaleFactor;
-
-				CGPoint roundedPosition = {0};
-				roundedPosition.x = floor(rawPosition.x);
-				roundedPosition.y = floor(rawPosition.y);
-
-				CGPoint fractionalPosition = {0};
-				fractionalPosition.x = rawPosition.x - roundedPosition.x;
-				fractionalPosition.y = rawPosition.y - roundedPosition.y;
+				simd_float2 roundedPosition = floor(rawPosition);
+				simd_float2 fractionalPosition = rawPosition - roundedPosition;
 
 				CachedGlyph cachedGlyph =
 				        [glyphCache cachedGlyph:glyph
@@ -211,10 +216,7 @@ struct Sprite
 				Sprite *sprite = (Sprite *)sprites.contents + spriteCount;
 				spriteCount++;
 
-				sprite->position.x = (float)roundedPosition.x;
-				sprite->position.y = (float)roundedPosition.y;
-				sprite->position -= cachedGlyph.offset;
-
+				sprite->position = roundedPosition - cachedGlyph.offset;
 				sprite->size = cachedGlyph.size;
 				sprite->textureCoordinatesBlack = cachedGlyph.positionBlack;
 				sprite->textureCoordinatesWhite = cachedGlyph.positionWhite;
@@ -292,7 +294,7 @@ struct Sprite
 	[super viewDidChangeBackingProperties];
 
 	glyphCache = [[GlyphCache alloc] initWithDevice:device
-	                                    scaleFactor:self.window.backingScaleFactor];
+	                                    scaleFactor:(float)self.window.backingScaleFactor];
 
 	self.layer.contentsScale = self.window.backingScaleFactor;
 	[self updateIOSurface];

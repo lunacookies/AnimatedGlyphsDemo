@@ -9,11 +9,11 @@ struct CachedGlyph
 
 @interface GlyphCache : NSObject
 
-- (instancetype)initWithDevice:(id<MTLDevice>)device scaleFactor:(CGFloat)scaleFactor;
+- (instancetype)initWithDevice:(id<MTLDevice>)device scaleFactor:(float)scaleFactor;
 
 - (CachedGlyph)cachedGlyph:(CGGlyph)glyph
                       font:(CTFontRef)font
-            subpixelOffset:(CGPoint)subpixelOffset;
+            subpixelOffset:(simd_float2)subpixelOffset;
 
 @property(readonly) id<MTLTexture> texture;
 
