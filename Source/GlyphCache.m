@@ -3,8 +3,10 @@ struct GlyphCacheEntry
 {
 	CGGlyph glyph;
 	CTFontRef font;
+	simd_float2 size;
+	simd_float2 textureCoordinatesBlack;
+	simd_float2 textureCoordinatesWhite;
 	simd_float2 subpixelOffset;
-	CachedGlyph cachedGlyph;
 };
 
 static const float padding = 2;
@@ -52,6 +54,9 @@ static const float padding = 2;
                       font:(CTFontRef)font
             subpixelOffset:(simd_float2)subpixelOffset
 {
+	Assert(simd_all(subpixelOffset < 1));
+	Assert(simd_all(subpixelOffset >= 0));
+
 	for (imm entryIndex = 0; entryIndex < entryCount; entryIndex++)
 	{
 		GlyphCacheEntry *entry = entries + entryIndex;
@@ -59,7 +64,12 @@ static const float padding = 2;
 		        entry->subpixelOffset.x == subpixelOffset.x &&
 		        entry->subpixelOffset.y == subpixelOffset.y)
 		{
-			return entry->cachedGlyph;
+			CachedGlyph result = {0};
+			result.inset = padding;
+			result.textureCoordinatesBlack = entry->textureCoordinatesBlack;
+			result.textureCoordinatesWhite = entry->textureCoordinatesWhite;
+			result.size = entry->size;
+			return result;
 		}
 	}
 
@@ -78,9 +88,6 @@ static const float padding = 2;
 	entry->font = font;
 	entry->subpixelOffset = subpixelOffset;
 
-	CachedGlyph *cachedGlyph = &entry->cachedGlyph;
-	cachedGlyph->offset = padding;
-
 	simd_float2 boundingRectOrigin = 0;
 	simd_float2 boundingRectSize = 0;
 	{
@@ -95,8 +102,8 @@ static const float padding = 2;
 		boundingRectSize *= scaleFactor;
 	}
 
-	cachedGlyph->size = ceil(boundingRectSize);
-	cachedGlyph->size += 2 * padding;
+	entry->size = ceil(boundingRectSize);
+	entry->size += 2 * padding;
 
 	for (bool32 black = 0; black <= 1; black++)
 	{
@@ -118,28 +125,23 @@ static const float padding = 2;
 			largestGlyphHeight = 0;
 		}
 
-		simd_float2 position = cursor;
-
 		if (black)
 		{
-			cachedGlyph->positionBlack.x = (float)position.x;
-			cachedGlyph->positionBlack.y = (float)position.y;
+			entry->textureCoordinatesBlack = cursor;
 		}
 		else
 		{
-			cachedGlyph->positionWhite.x = (float)position.x;
-			cachedGlyph->positionWhite.y = (float)position.y;
+			entry->textureCoordinatesWhite = cursor;
 		}
 
-		position -= boundingRectOrigin;
-		position += subpixelOffset;
-		position += padding;
-
 		{
-			CGPoint drawPosition = {0};
-			drawPosition.x = position.x / scaleFactor;
-			drawPosition.y = position.y / scaleFactor;
-			CTFontDrawGlyphs(font, &glyph, &drawPosition, 1, context);
+			simd_float2 drawPosition = cursor;
+			drawPosition -= boundingRectOrigin;
+			drawPosition += subpixelOffset;
+			drawPosition += padding;
+			drawPosition /= scaleFactor;
+			CGPoint drawPositionCG = {drawPosition.x, drawPosition.y};
+			CTFontDrawGlyphs(font, &glyph, &drawPositionCG, 1, context);
 		}
 
 		[texture replaceRegion:MTLRegionMake2D(0, 0, (umm)diameter, (umm)diameter)
@@ -151,7 +153,18 @@ static const float padding = 2;
 		cursor.x += ceil(boundingRectSize.x) + 2 * padding;
 	}
 
-	return *cachedGlyph;
+	CachedGlyph result = {0};
+	result.inset = padding;
+	result.size = entry->size;
+	result.textureCoordinatesBlack = entry->textureCoordinatesBlack;
+	result.textureCoordinatesWhite = entry->textureCoordinatesWhite;
+
+	Assert(simd_all(result.inset == floor(result.inset)));
+	Assert(simd_all(result.size == floor(result.size)));
+	Assert(simd_all(result.textureCoordinatesBlack == floor(result.textureCoordinatesBlack)));
+	Assert(simd_all(result.textureCoordinatesWhite == floor(result.textureCoordinatesWhite)));
+
+	return result;
 }
 
 - (void)dealloc

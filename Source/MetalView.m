@@ -205,21 +205,23 @@ struct Sprite
 				        lineOrigin + glyphPosition + glyphBoundingRectOrigin;
 				rawPosition *= scaleFactor;
 
-				simd_float2 roundedPosition = floor(rawPosition);
-				simd_float2 fractionalPosition = rawPosition - roundedPosition;
+				simd_float2 integralComponent = floor(rawPosition);
+				simd_float2 fractionalComponent = rawPosition - integralComponent;
 
 				CachedGlyph cachedGlyph =
 				        [glyphCache cachedGlyph:glyph
 				                           font:runFont
-				                 subpixelOffset:fractionalPosition];
+				                 subpixelOffset:fractionalComponent];
 
 				Sprite *sprite = (Sprite *)sprites.contents + spriteCount;
 				spriteCount++;
 
-				sprite->position = roundedPosition - cachedGlyph.offset;
+				sprite->position = integralComponent - cachedGlyph.inset;
 				sprite->size = cachedGlyph.size;
-				sprite->textureCoordinatesBlack = cachedGlyph.positionBlack;
-				sprite->textureCoordinatesWhite = cachedGlyph.positionWhite;
+				sprite->textureCoordinatesBlack =
+				        cachedGlyph.textureCoordinatesBlack;
+				sprite->textureCoordinatesWhite =
+				        cachedGlyph.textureCoordinatesWhite;
 
 				sprite->color = simdColor;
 			}

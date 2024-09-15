@@ -1,10 +1,10 @@
 typedef struct CachedGlyph CachedGlyph;
 struct CachedGlyph
 {
-	simd_float2 positionBlack;
-	simd_float2 positionWhite;
+	simd_float2 inset;
 	simd_float2 size;
-	simd_float2 offset;
+	simd_float2 textureCoordinatesBlack;
+	simd_float2 textureCoordinatesWhite;
 };
 
 @interface GlyphCache : NSObject
