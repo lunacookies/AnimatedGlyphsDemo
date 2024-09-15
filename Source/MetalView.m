@@ -123,6 +123,7 @@ struct Sprite
 		} while (frameGlyphCount > spriteCapacity);
 		sprites = [device newBufferWithLength:(umm)spriteCapacity * sizeof(Sprite)
 		                              options:MTLResourceStorageModeShared];
+		sprites.label = @"Sprites";
 	}
 
 	imm spriteCount = 0;
