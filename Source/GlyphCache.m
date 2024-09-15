@@ -32,16 +32,27 @@ static const float padding = 2;
 
 	diameter = 1024;
 
+	MTLPixelFormat pixelFormat = MTLPixelFormatR8Unorm;
+	imm align = (imm)[device minimumLinearTextureAlignmentForPixelFormat:pixelFormat];
+	imm bytesPerRow = (imm)AlignPow2((umm)diameter, align);
+	imm bytesNeeded = bytesPerRow * diameter;
+	id<MTLBuffer> buffer = [device newBufferWithLength:(umm)bytesNeeded
+	                                           options:MTLResourceStorageModeShared];
+	buffer.label = @"Glyph Cache Backing Store";
+
 	MTLTextureDescriptor *descriptor = [[MTLTextureDescriptor alloc] init];
 	descriptor.width = (umm)diameter;
 	descriptor.height = (umm)diameter;
-	descriptor.pixelFormat = MTLPixelFormatR8Unorm;
-	descriptor.storageMode = MTLStorageModeShared;
-	texture = [device newTextureWithDescriptor:descriptor];
+	descriptor.pixelFormat = pixelFormat;
+	descriptor.storageMode = buffer.storageMode;
+	texture = [buffer newTextureWithDescriptor:descriptor
+	                                    offset:0
+	                               bytesPerRow:(umm)bytesPerRow];
 	texture.label = @"Glyph Cache";
 
-	context = CGBitmapContextCreate(NULL, (umm)diameter, (umm)diameter, 8, (umm)diameter,
-	        CGColorSpaceCreateWithName(kCGColorSpaceLinearGray), kCGImageAlphaOnly);
+	context = CGBitmapContextCreate(buffer.contents, (umm)diameter, (umm)diameter, 8,
+	        (umm)bytesPerRow, CGColorSpaceCreateWithName(kCGColorSpaceLinearGray),
+	        kCGImageAlphaOnly);
 	CGContextScaleCTM(context, scaleFactor, scaleFactor);
 
 	entryCapacity = 1024;
@@ -141,11 +152,6 @@ static const float padding = 2;
 				CGPoint drawPositionCG = {drawPosition.x, drawPosition.y};
 				CTFontDrawGlyphs(font, &glyph, &drawPositionCG, 1, context);
 			}
-
-			[texture replaceRegion:MTLRegionMake2D(0, 0, (umm)diameter, (umm)diameter)
-			           mipmapLevel:0
-			             withBytes:CGBitmapContextGetData(context)
-			           bytesPerRow:(umm)diameter];
 
 			largestGlyphHeight = Max(largestGlyphHeight, boundingRectSize.y);
 			cursor.x += ceil(boundingRectSize.x) + 2 * padding;

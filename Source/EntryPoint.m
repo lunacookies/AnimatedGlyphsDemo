@@ -30,6 +30,25 @@ typedef ptrdiff_t imm;
 		__builtin_debugtrap(); \
 	}
 
+static uint64
+SetBitCount(uint64 x)
+{
+	return (uint64)__builtin_popcountll(x);
+}
+
+static umm
+AlignPow2(umm base, imm align)
+{
+	Assert(align >= 1);
+	Assert(SetBitCount((uint64)align) == 1);
+
+	umm mask = (umm)align - 1;
+	umm result = (base + mask) & ~mask;
+
+	Assert(result >= base);
+	return result;
+}
+
 @interface
 CALayer (Private)
 - (void)setContentsChanged;
