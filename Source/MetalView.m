@@ -202,8 +202,7 @@ struct Sprite
 					continue;
 				}
 
-				simd_float2 rawPosition =
-				        lineOrigin + glyphPosition + glyphBoundingRectOrigin;
+				simd_float2 rawPosition = lineOrigin + glyphPosition;
 				rawPosition *= scaleFactor;
 
 				simd_float2 integralComponent = floor(rawPosition);
@@ -217,7 +216,7 @@ struct Sprite
 				Sprite *sprite = (Sprite *)sprites.contents + spriteCount;
 				spriteCount++;
 
-				sprite->position = integralComponent - cachedGlyph.inset;
+				sprite->position = integralComponent - cachedGlyph.offset;
 				sprite->size = cachedGlyph.size;
 				sprite->textureCoordinatesBlack =
 				        cachedGlyph.textureCoordinatesBlack;

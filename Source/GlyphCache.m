@@ -3,6 +3,7 @@ struct GlyphCacheEntry
 {
 	CGGlyph glyph;
 	CTFontRef font;
+	simd_float2 offset;
 	simd_float2 size;
 	simd_float2 textureCoordinatesBlack;
 	simd_float2 textureCoordinatesWhite;
@@ -55,6 +56,10 @@ static const float padding = 2;
 	        kCGImageAlphaOnly);
 	CGContextScaleCTM(context, scaleFactor, scaleFactor);
 
+	// Disable Core Graphics’s built-in subpixel quantization because we perform our own.
+	// Ideally we’d just use the built-in subpixel quantization, but no API is exposed for it.
+	CGContextSetAllowsFontSubpixelQuantization(context, false);
+
 	entryCapacity = 1024;
 	entries = malloc((umm)entryCapacity * sizeof(GlyphCacheEntry));
 
@@ -67,6 +72,14 @@ static const float padding = 2;
 {
 	Assert(simd_all(subpixelOffset < 1));
 	Assert(simd_all(subpixelOffset >= 0));
+
+	{
+		float subpixelOffsetResolution = 4;
+		subpixelOffset =
+		        floor(subpixelOffset * subpixelOffsetResolution) / subpixelOffsetResolution;
+		Assert(simd_all(subpixelOffset < 1));
+		Assert(simd_all(subpixelOffset >= 0));
+	}
 
 	GlyphCacheEntry *entry = NULL;
 
@@ -111,23 +124,15 @@ static const float padding = 2;
 			boundingRectSize *= scaleFactor;
 		}
 
+		entry->offset = padding - floor(boundingRectOrigin);
 		entry->size = ceil(boundingRectSize);
 		entry->size += 2 * padding;
 
+		float xStep = ceil(boundingRectSize.x) + 2 * padding;
+
 		for (bool32 black = 0; black <= 1; black++)
 		{
-			CFStringRef colorName = NULL;
-			if (black)
-			{
-				colorName = kCGColorBlack;
-			}
-			else
-			{
-				colorName = kCGColorWhite;
-			}
-			CGContextSetFillColorWithColor(context, CGColorGetConstantColor(colorName));
-
-			if (cursor.x + boundingRectSize.x + 2 * padding >= diameter)
+			if (cursor.x + xStep >= diameter)
 			{
 				cursor.x = 0;
 				cursor.y += ceil(largestGlyphHeight) + 2 * padding;
@@ -145,26 +150,35 @@ static const float padding = 2;
 
 			{
 				simd_float2 drawPosition = cursor;
-				drawPosition -= boundingRectOrigin;
-				drawPosition += subpixelOffset;
+				drawPosition -= floor(boundingRectOrigin);
 				drawPosition += padding;
+
+				// The draw position (baseline, left side) should be on a pixel
+				// boundary, up until we add in the subpixel offset.
+				Assert(simd_all(drawPosition == floor(drawPosition)));
+				drawPosition += subpixelOffset;
+
 				drawPosition /= scaleFactor;
 				CGPoint drawPositionCG = {drawPosition.x, drawPosition.y};
+
+				CFStringRef colorName = black ? kCGColorBlack : kCGColorWhite;
+				CGContextSetFillColorWithColor(
+				        context, CGColorGetConstantColor(colorName));
 				CTFontDrawGlyphs(font, &glyph, &drawPositionCG, 1, context);
 			}
 
 			largestGlyphHeight = Max(largestGlyphHeight, boundingRectSize.y);
-			cursor.x += ceil(boundingRectSize.x) + 2 * padding;
+			cursor.x += xStep;
 		}
 	}
 
 	CachedGlyph result = {0};
-	result.inset = padding;
+	result.offset = entry->offset;
 	result.size = entry->size;
 	result.textureCoordinatesBlack = entry->textureCoordinatesBlack;
 	result.textureCoordinatesWhite = entry->textureCoordinatesWhite;
 
-	Assert(simd_all(result.inset == floor(result.inset)));
+	Assert(simd_all(result.offset == floor(result.offset)));
 	Assert(simd_all(result.size == floor(result.size)));
 	Assert(simd_all(result.textureCoordinatesBlack == floor(result.textureCoordinatesBlack)));
 	Assert(simd_all(result.textureCoordinatesWhite == floor(result.textureCoordinatesWhite)));
