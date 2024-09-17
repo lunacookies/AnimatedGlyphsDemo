@@ -176,10 +176,6 @@ struct Sprite
 			CGPoint *glyphPositions = calloc((umm)runGlyphCount, sizeof(CGPoint));
 			CTRunGetPositions(run, (CFRange){0}, glyphPositions);
 
-			CGRect *glyphBoundingRects = calloc((umm)runGlyphCount, sizeof(CGRect));
-			CTFontGetBoundingRectsForGlyphs(runFont, kCTFontOrientationDefault, glyphs,
-			        glyphBoundingRects, runGlyphCount);
-
 			for (imm glyphIndex = 0; glyphIndex < runGlyphCount; glyphIndex++)
 			{
 				CGGlyph glyph = glyphs[glyphIndex];
@@ -187,25 +183,6 @@ struct Sprite
 				simd_float2 glyphPosition = 0;
 				glyphPosition.x = (float)glyphPositions[glyphIndex].x;
 				glyphPosition.y = (float)glyphPositions[glyphIndex].y;
-
-				simd_float2 glyphBoundingRectOrigin = 0;
-				simd_float2 glyphBoundingRectSize = 0;
-				{
-					CGRect glyphBoundingRect = glyphBoundingRects[glyphIndex];
-					glyphBoundingRectOrigin.x =
-					        (float)glyphBoundingRect.origin.x;
-					glyphBoundingRectOrigin.y =
-					        (float)glyphBoundingRect.origin.y;
-					glyphBoundingRectSize.x =
-					        (float)glyphBoundingRect.size.width;
-					glyphBoundingRectSize.y =
-					        (float)glyphBoundingRect.size.height;
-				}
-
-				if (simd_any(glyphBoundingRectSize == 0))
-				{
-					continue;
-				}
 
 				simd_float2 rawPosition = lineOrigin + glyphPosition;
 				rawPosition *= scaleFactor;
@@ -233,7 +210,6 @@ struct Sprite
 
 			free(glyphs);
 			free(glyphPositions);
-			free(glyphBoundingRects);
 		}
 	}
 
@@ -244,7 +220,7 @@ struct Sprite
 	CFRelease(typesetter);
 
 	Assert(spriteCount <= spriteCapacity);
-	Assert(spriteCount <= frameGlyphCount);
+	Assert(spriteCount == frameGlyphCount);
 
 	id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
 
