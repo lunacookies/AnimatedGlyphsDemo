@@ -124,7 +124,7 @@ static const float padding = 2;
 			boundingRectSize *= scaleFactor;
 		}
 
-		entry->offset = padding - floor(boundingRectOrigin);
+		entry->offset = padding - round(boundingRectOrigin);
 		entry->size = ceil(boundingRectSize);
 		entry->size += 2 * padding;
 
@@ -149,9 +149,7 @@ static const float padding = 2;
 			}
 
 			{
-				simd_float2 drawPosition = cursor;
-				drawPosition -= floor(boundingRectOrigin);
-				drawPosition += padding;
+				simd_float2 drawPosition = cursor + entry->offset;
 
 				// The draw position (baseline, left side) should be on a pixel
 				// boundary, up until we add in the subpixel offset.
