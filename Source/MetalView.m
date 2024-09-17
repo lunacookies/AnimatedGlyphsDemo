@@ -77,8 +77,13 @@ struct Sprite
 		            NSForegroundColorAttributeName : NSColor.labelColor,
 	            }];
 
-	CTFramesetterRef framesetter = CTFramesetterCreateWithAttributedString(
-	        (__bridge CFAttributedStringRef)attributedString);
+	CFDictionaryRef typesetterOptions = (__bridge CFDictionaryRef) @{
+		(__bridge NSString *)
+		kCTTypesetterOptionAllowUnboundedLayout : (__bridge NSNumber *)kCFBooleanTrue
+	};
+	CTTypesetterRef typesetter = CTTypesetterCreateWithAttributedStringAndOptions(
+	        (__bridge CFAttributedStringRef)attributedString, typesetterOptions);
+	CTFramesetterRef framesetter = CTFramesetterCreateWithTypesetter(typesetter);
 
 	CGSize frameSizeConstraints = self.bounds.size;
 	frameSizeConstraints.height = CGFLOAT_MAX;
@@ -232,6 +237,12 @@ struct Sprite
 		}
 	}
 
+	free(lineOrigins);
+	CFRelease(frame);
+	CFRelease(path);
+	CFRelease(framesetter);
+	CFRelease(typesetter);
+
 	Assert(spriteCount <= spriteCapacity);
 	Assert(spriteCount <= frameGlyphCount);
 
@@ -284,11 +295,6 @@ struct Sprite
 	[commandBuffer commit];
 	[commandBuffer waitUntilCompleted];
 	[self.layer setContentsChanged];
-
-	free(lineOrigins);
-	CFRelease(frame);
-	CFRelease(framesetter);
-	CFRelease(path);
 }
 
 - (void)viewDidChangeBackingProperties
