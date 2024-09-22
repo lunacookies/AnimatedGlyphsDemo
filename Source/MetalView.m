@@ -252,7 +252,7 @@ struct Sprite
 		[encoder setRenderPipelineState:pipelineState];
 		[encoder useResource:glyphCache.texture
 		               usage:MTLResourceUsageRead
-		              stages:MTLRenderStageFragment];
+		              stages:MTLRenderStageVertex | MTLRenderStageFragment];
 		[encoder useResource:sprites
 		               usage:MTLResourceUsageRead
 		              stages:MTLRenderStageVertex | MTLRenderStageFragment];
