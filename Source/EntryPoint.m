@@ -49,8 +49,7 @@ AlignPow2(umm base, imm align)
 	return result;
 }
 
-@interface
-CALayer (Private)
+@interface CALayer (Private)
 - (void)setContentsChanged;
 @end
 
