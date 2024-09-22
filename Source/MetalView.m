@@ -16,11 +16,20 @@ struct Sprite
 	simd_float4 color;
 };
 
+typedef struct Atom Atom;
+struct Atom
+{
+	uint16 codeUnit;
+	simd_float2 position;
+	simd_float2 targetPosition;
+};
+
 @implementation MetalView
 {
 	id<MTLDevice> device;
 	id<MTLCommandQueue> commandQueue;
 	id<MTLRenderPipelineState> pipelineState;
+	CADisplayLink *displayLink;
 
 	IOSurfaceRef iosurface;
 	id<MTLTexture> texture;
@@ -29,7 +38,9 @@ struct Sprite
 	id<MTLBuffer> sprites;
 	imm spriteCapacity;
 
-	NSMutableString *contents;
+	Atom *atoms;
+	imm atomCapacity;
+	imm atomCount;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
@@ -57,10 +68,18 @@ struct Sprite
 
 	pipelineState = [device newRenderPipelineStateWithDescriptor:descriptor error:nil];
 
-	contents = [[NSMutableString alloc] init];
-	[contents appendString:@"hello world"];
+	displayLink = [self displayLinkWithTarget:self selector:@selector(displayLinkDidFire)];
+	[displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+
+	atomCapacity = 8;
+	atoms = calloc((umm)atomCapacity, sizeof(Atom));
 
 	return self;
+}
+
+- (void)displayLinkDidFire
+{
+	self.needsDisplay = YES;
 }
 
 - (BOOL)wantsUpdateLayer
@@ -70,8 +89,16 @@ struct Sprite
 
 - (void)updateLayer
 {
+	uint16 *codeUnits = calloc((umm)atomCount, sizeof(uint16));
+	for (imm i = 0; i < atomCount; i++)
+	{
+		codeUnits[i] = atoms[i].codeUnit;
+	}
+	NSString *string = [NSString stringWithCharacters:codeUnits length:(umm)atomCount];
+	free(codeUnits);
+
 	NSAttributedString *attributedString = [[NSAttributedString alloc]
-	        initWithString:contents
+	        initWithString:string
 	            attributes:@{
 		            NSFontAttributeName : [NSFont systemFontOfSize:13],
 		            NSForegroundColorAttributeName : NSColor.labelColor,
@@ -176,6 +203,9 @@ struct Sprite
 			CGPoint *glyphPositions = calloc((umm)runGlyphCount, sizeof(CGPoint));
 			CTRunGetPositions(run, (CFRange){0}, glyphPositions);
 
+			CFIndex *stringIndices = calloc((umm)runGlyphCount, sizeof(CFIndex));
+			CTRunGetStringIndices(run, (CFRange){0}, stringIndices);
+
 			for (imm glyphIndex = 0; glyphIndex < runGlyphCount; glyphIndex++)
 			{
 				CGGlyph glyph = glyphs[glyphIndex];
@@ -187,6 +217,27 @@ struct Sprite
 				simd_float2 rawPosition = lineOrigin + glyphPosition;
 				rawPosition *= scaleFactor;
 
+				imm atomsStart = stringIndices[glyphIndex];
+				imm atomsEnd = atomsStart + 1;
+				if (glyphIndex < runGlyphCount - 1)
+				{
+					atomsEnd = stringIndices[glyphIndex + 1];
+				}
+				Assert(atomsStart < atomsEnd);
+
+				for (imm atomIndex = atomsStart; atomIndex < atomsEnd; atomIndex++)
+				{
+					Atom *atom = atoms + atomIndex;
+					atom->targetPosition = rawPosition;
+					atom->targetPosition.y =
+					        (float)texture.height - atom->targetPosition.y;
+					atom->position = simd_mix(
+					        atom->position, atom->targetPosition, 0.1f);
+				}
+
+				rawPosition = atoms[atomsStart].position;
+				rawPosition.y = (float)texture.height - rawPosition.y;
+
 				simd_float2 integralComponent = floor(rawPosition);
 				simd_float2 fractionalComponent = rawPosition - integralComponent;
 
@@ -197,19 +248,18 @@ struct Sprite
 
 				Sprite *sprite = (Sprite *)sprites.contents + spriteCount;
 				spriteCount++;
-
 				sprite->position = integralComponent - cachedGlyph.offset;
 				sprite->size = cachedGlyph.size;
 				sprite->textureCoordinatesBlack =
 				        cachedGlyph.textureCoordinatesBlack;
 				sprite->textureCoordinatesWhite =
 				        cachedGlyph.textureCoordinatesWhite;
-
 				sprite->color = simdColor;
 			}
 
 			free(glyphs);
 			free(glyphPositions);
+			free(stringIndices);
 		}
 	}
 
@@ -339,24 +389,43 @@ struct Sprite
 - (void)insertText:(id)idString
 {
 	NSString *string = idString;
-	[contents appendString:string];
+	imm length = (imm)string.length;
+
+	if (atomCount + length > atomCapacity)
+	{
+		do
+		{
+			atomCapacity *= 2;
+		} while (atomCount + length > atomCapacity);
+		atoms = realloc(atoms, sizeof(Atom) * (umm)atomCapacity);
+	}
+
+	uint16 *codeUnits = calloc((umm)length, sizeof(uint16));
+	[string getCharacters:codeUnits range:(NSRange){0, (umm)length}];
+
+	for (imm i = 0; i < length; i++)
+	{
+		Atom *atom = atoms + atomCount + i;
+		memset(atom, 0, sizeof(*atom));
+		atom->codeUnit = codeUnits[i];
+	}
+	atomCount += length;
+
+	free(codeUnits);
+
 	self.needsDisplay = YES;
 }
 
 - (void)insertNewline:(id)sender
 {
-	[contents appendString:@"\n"];
-	self.needsDisplay = YES;
+	[self insertText:@"\n"];
 }
 
 - (void)deleteBackward:(id)sender
 {
-	if (contents.length > 0)
+	if (atomCount > 0)
 	{
-		NSRange range = {0};
-		range.length = 1;
-		range.location = contents.length - range.length;
-		[contents deleteCharactersInRange:range];
+		atomCount--;
 		self.needsDisplay = YES;
 	}
 }
