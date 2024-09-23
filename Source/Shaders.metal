@@ -89,3 +89,19 @@ fragment_main(rasterizer_data input [[stage_in]], constant arguments &arguments)
 	result *= sample;
 	return result;
 }
+
+struct loupe_arguments
+{
+	texture2d<float> src;
+	texture2d<float, access::write> dst;
+};
+
+kernel void
+loupe_main(uint2 position_in_grid [[thread_position_in_grid]],
+        uint2 grid_size [[threads_per_grid]],
+        constant loupe_arguments &arguments)
+{
+	float2 uv = ((float2)position_in_grid + 0.5) / (float2)grid_size;
+	float4 src_color = arguments.src.sample(sampler(filter::nearest), uv);
+	arguments.dst.write(src_color, position_in_grid);
+}

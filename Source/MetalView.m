@@ -6,6 +6,13 @@ struct Arguments
 	uint64 sprites;
 };
 
+typedef struct LoupeArguments LoupeArguments;
+struct LoupeArguments
+{
+	MTLResourceID src;
+	MTLResourceID dst;
+};
+
 typedef struct Sprite Sprite;
 struct Sprite
 {
@@ -31,10 +38,12 @@ struct Atom
 	id<MTLDevice> device;
 	id<MTLCommandQueue> commandQueue;
 	id<MTLRenderPipelineState> pipelineState;
+	id<MTLComputePipelineState> loupePipelineState;
 	CADisplayLink *displayLink;
 
 	IOSurfaceRef iosurface;
 	id<MTLTexture> texture;
+	id<MTLTexture> offscreenTexture;
 
 	GlyphCache *glyphCache;
 	id<MTLBuffer> sprites;
@@ -71,6 +80,10 @@ struct Atom
 	descriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
 
 	pipelineState = [device newRenderPipelineStateWithDescriptor:descriptor error:nil];
+
+	loupePipelineState = [device
+	        newComputePipelineStateWithFunction:[library newFunctionWithName:@"loupe_main"]
+	                                      error:nil];
 
 	displayLink = [self displayLinkWithTarget:self selector:@selector(displayLinkDidFire)];
 	[displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
@@ -305,49 +318,69 @@ struct Atom
 
 	id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
 
-	NSColor *convertedBackgroundColor =
-	        [NSColor.textBackgroundColor colorUsingColorSpace:colorSpace];
-	MTLClearColor clearColor = {0};
-	clearColor.red = convertedBackgroundColor.redComponent;
-	clearColor.green = convertedBackgroundColor.greenComponent;
-	clearColor.blue = convertedBackgroundColor.blueComponent;
-	clearColor.alpha = convertedBackgroundColor.alphaComponent;
-
-	MTLRenderPassDescriptor *descriptor = [[MTLRenderPassDescriptor alloc] init];
-	descriptor.colorAttachments[0].texture = texture;
-	descriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
-	descriptor.colorAttachments[0].clearColor = clearColor;
-
-	id<MTLRenderCommandEncoder> encoder =
-	        [commandBuffer renderCommandEncoderWithDescriptor:descriptor];
-
-	NSSize size = [self convertSizeToBacking:self.bounds.size];
-	Arguments arguments = {0};
-	arguments.size.x = (float)size.width;
-	arguments.size.y = (float)size.height;
-	arguments.glyphCacheTexture = glyphCache.texture.gpuResourceID;
-	arguments.sprites = sprites.gpuAddress;
-
-	if (spriteCount > 0)
 	{
-		[encoder setRenderPipelineState:pipelineState];
-		[encoder useResource:glyphCache.texture
-		               usage:MTLResourceUsageRead
-		              stages:MTLRenderStageVertex | MTLRenderStageFragment];
-		[encoder useResource:sprites
-		               usage:MTLResourceUsageRead
-		              stages:MTLRenderStageVertex | MTLRenderStageFragment];
+		NSColor *convertedBackgroundColor =
+		        [NSColor.textBackgroundColor colorUsingColorSpace:colorSpace];
+		MTLClearColor clearColor = {0};
+		clearColor.red = convertedBackgroundColor.redComponent;
+		clearColor.green = convertedBackgroundColor.greenComponent;
+		clearColor.blue = convertedBackgroundColor.blueComponent;
+		clearColor.alpha = convertedBackgroundColor.alphaComponent;
 
-		[encoder setVertexBytes:&arguments length:sizeof(arguments) atIndex:0];
-		[encoder setFragmentBytes:&arguments length:sizeof(arguments) atIndex:0];
+		MTLRenderPassDescriptor *descriptor = [[MTLRenderPassDescriptor alloc] init];
+		descriptor.colorAttachments[0].texture = offscreenTexture;
+		descriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
+		descriptor.colorAttachments[0].clearColor = clearColor;
 
-		[encoder drawPrimitives:MTLPrimitiveTypeTriangle
-		            vertexStart:0
-		            vertexCount:6
-		          instanceCount:(umm)spriteCount];
+		id<MTLRenderCommandEncoder> encoder =
+		        [commandBuffer renderCommandEncoderWithDescriptor:descriptor];
+
+		NSSize size = [self convertSizeToBacking:self.bounds.size];
+		Arguments arguments = {0};
+		arguments.size.x = (float)size.width;
+		arguments.size.y = (float)size.height;
+		arguments.glyphCacheTexture = glyphCache.texture.gpuResourceID;
+		arguments.sprites = sprites.gpuAddress;
+
+		if (spriteCount > 0)
+		{
+			[encoder setRenderPipelineState:pipelineState];
+			[encoder useResource:glyphCache.texture
+			               usage:MTLResourceUsageRead
+			              stages:MTLRenderStageVertex | MTLRenderStageFragment];
+			[encoder useResource:sprites
+			               usage:MTLResourceUsageRead
+			              stages:MTLRenderStageVertex | MTLRenderStageFragment];
+
+			[encoder setVertexBytes:&arguments length:sizeof(arguments) atIndex:0];
+			[encoder setFragmentBytes:&arguments length:sizeof(arguments) atIndex:0];
+
+			[encoder drawPrimitives:MTLPrimitiveTypeTriangle
+			            vertexStart:0
+			            vertexCount:6
+			          instanceCount:(umm)spriteCount];
+		}
+
+		[encoder endEncoding];
 	}
 
-	[encoder endEncoding];
+	{
+		id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
+
+		LoupeArguments arguments = {0};
+		arguments.src = offscreenTexture.gpuResourceID;
+		arguments.dst = texture.gpuResourceID;
+
+		[encoder setComputePipelineState:loupePipelineState];
+		[encoder useResource:offscreenTexture usage:MTLResourceUsageRead];
+		[encoder useResource:texture usage:MTLResourceUsageWrite];
+		[encoder setBytes:&arguments length:sizeof(arguments) atIndex:0];
+		[encoder dispatchThreads:MTLSizeMake(texture.width, texture.height, 1)
+		        threadsPerThreadgroup:MTLSizeMake(32, 32, 1)];
+
+		[encoder endEncoding];
+	}
+
 
 	[commandBuffer commit];
 	[commandBuffer waitUntilCompleted];
@@ -392,7 +425,8 @@ struct Atom
 	MTLTextureDescriptor *descriptor = [[MTLTextureDescriptor alloc] init];
 	descriptor.width = (umm)size.width;
 	descriptor.height = (umm)size.height;
-	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+	descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead |
+	                   MTLTextureUsageShaderWrite;
 	descriptor.pixelFormat = MTLPixelFormatBGRA8Unorm;
 
 	if (iosurface != NULL)
@@ -402,6 +436,7 @@ struct Atom
 
 	iosurface = IOSurfaceCreate((__bridge CFDictionaryRef)properties);
 	texture = [device newTextureWithDescriptor:descriptor iosurface:iosurface plane:0];
+	offscreenTexture = [device newTextureWithDescriptor:descriptor];
 	texture.label = @"Layer Contents";
 
 	self.layer.contents = (__bridge id)iosurface;
