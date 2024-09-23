@@ -43,6 +43,8 @@ struct Atom
 	Atom *atoms;
 	imm atomCapacity;
 	imm atomCount;
+
+	float scrollOffset;
 }
 
 - (instancetype)initWithFrame:(NSRect)frame
@@ -119,6 +121,16 @@ struct Atom
 
 	CGSize frameSize = CTFramesetterSuggestFrameSizeWithConstraints(
 	        framesetter, (CFRange){0}, NULL, frameSizeConstraints, NULL);
+
+	if (self.bounds.size.height > frameSize.height)
+	{
+		scrollOffset = 0;
+	}
+	else
+	{
+		scrollOffset = simd_clamp(
+		        scrollOffset, 0, (float)(frameSize.height - self.bounds.size.height));
+	}
 
 	CGRect frameRect = self.bounds;
 	frameRect.origin.y = self.bounds.size.height - frameSize.height;
@@ -267,6 +279,7 @@ struct Atom
 				Sprite *sprite = (Sprite *)sprites.contents + spriteCount;
 				spriteCount++;
 				sprite->position = integralComponent - cachedGlyph.offset;
+				sprite->position.y += scrollOffset * scaleFactor;
 				sprite->size = cachedGlyph.size;
 				sprite->textureCoordinatesBlack =
 				        cachedGlyph.textureCoordinatesBlack;
@@ -446,6 +459,12 @@ struct Atom
 		atomCount--;
 		self.needsDisplay = YES;
 	}
+}
+
+- (void)scrollWheel:(NSEvent *)event
+{
+	scrollOffset -= (float)event.scrollingDeltaY;
+	self.needsDisplay = YES;
 }
 
 @end
