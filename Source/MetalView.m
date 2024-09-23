@@ -21,7 +21,9 @@ struct Atom
 {
 	uint16 codeUnit;
 	simd_float2 position;
-	simd_float2 targetPosition;
+	simd_float2 positionTarget;
+	simd_float4 color;
+	simd_float4 colorTarget;
 };
 
 @implementation MetalView
@@ -228,11 +230,27 @@ struct Atom
 				for (imm atomIndex = atomsStart; atomIndex < atomsEnd; atomIndex++)
 				{
 					Atom *atom = atoms + atomIndex;
-					atom->targetPosition = rawPosition;
-					atom->targetPosition.y =
-					        (float)texture.height - atom->targetPosition.y;
-					atom->position = simd_mix(
-					        atom->position, atom->targetPosition, 0.1f);
+
+					simd_float2 positionTargetOld = atom->positionTarget;
+					simd_float2 positionTargetNew = rawPosition;
+					positionTargetNew.y =
+					        (float)texture.height - positionTargetNew.y;
+
+					atom->positionTarget = positionTargetNew;
+					atom->colorTarget = simdColor;
+
+					if (simd_all(positionTargetOld != positionTargetNew))
+					{
+						atom->position = atom->positionTarget;
+						atom->color.a = 0;
+					}
+					else
+					{
+						atom->position = simd_mix(
+						        atom->position, atom->positionTarget, 0.1f);
+						atom->color = simd_mix(
+						        atom->color, atom->colorTarget, 0.05f);
+					}
 				}
 
 				rawPosition = atoms[atomsStart].position;
@@ -254,7 +272,7 @@ struct Atom
 				        cachedGlyph.textureCoordinatesBlack;
 				sprite->textureCoordinatesWhite =
 				        cachedGlyph.textureCoordinatesWhite;
-				sprite->color = simdColor;
+				sprite->color = atoms[atomsStart].color;
 			}
 
 			free(glyphs);
