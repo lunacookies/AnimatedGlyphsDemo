@@ -51,9 +51,11 @@ static const float padding = 2;
 	                               bytesPerRow:(umm)bytesPerRow];
 	texture.label = @"Glyph Cache";
 
+	CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(kCGColorSpaceLinearGray);
 	context = CGBitmapContextCreate(buffer.contents, (umm)diameter, (umm)diameter, 8,
-	        (umm)bytesPerRow, CGColorSpaceCreateWithName(kCGColorSpaceLinearGray),
-	        kCGImageAlphaOnly);
+	        (umm)bytesPerRow, colorSpace, kCGImageAlphaOnly);
+	CFRelease(colorSpace);
+
 	CGContextScaleCTM(context, scaleFactor, scaleFactor);
 
 	// Disable Core Graphics’s built-in subpixel quantization because we perform our own.
